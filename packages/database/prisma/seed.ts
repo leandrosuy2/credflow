@@ -9,17 +9,17 @@ async function main() {
   console.log('🌱 Seed CredFlow (teste)...\n');
 
   // ——— Níveis (Bronze, Prata, Ouro) ———
-  await prisma.nivel.upsert({
+  const nivelBronze = await prisma.nivel.upsert({
     where: { nome: 'BRONZE' },
     create: { nome: 'BRONZE', valorAdesao: 200, valorBonus: 100, ordem: 1 },
     update: { valorAdesao: 200, valorBonus: 100, ordem: 1 },
   });
-  await prisma.nivel.upsert({
+  const nivelPrata = await prisma.nivel.upsert({
     where: { nome: 'PRATA' },
     create: { nome: 'PRATA', valorAdesao: 300, valorBonus: 150, ordem: 2 },
     update: { valorAdesao: 300, valorBonus: 150, ordem: 2 },
   });
-  await prisma.nivel.upsert({
+  const nivelOuro = await prisma.nivel.upsert({
     where: { nome: 'OURO' },
     create: { nome: 'OURO', valorAdesao: 500, valorBonus: 250, ordem: 3 },
     update: { valorAdesao: 500, valorBonus: 250, ordem: 3 },
@@ -60,7 +60,7 @@ async function main() {
     console.log('✓ Admin já existe: admin@credflow.com');
   }
 
-  // ——— Vendedores ———
+  // ——— Vendedores (raiz da árvore de indicação: Carlos não tem indicador) ———
   const v1 = await prisma.usuario.upsert({
     where: { email: 'vendedor1@credflow.com' },
     create: {
@@ -68,9 +68,11 @@ async function main() {
       email: 'vendedor1@credflow.com',
       senhaHash: await bcrypt.hash('123456', SALT),
       tipo: 'vendedor',
+      nivelId: nivelOuro.id,
     },
-    update: {},
+    update: { indicadorId: null, nivelId: nivelOuro.id },
   });
+  // Ana foi indicada por Carlos
   const v2 = await prisma.usuario.upsert({
     where: { email: 'vendedor2@credflow.com' },
     create: {
@@ -78,12 +80,14 @@ async function main() {
       email: 'vendedor2@credflow.com',
       senhaHash: await bcrypt.hash('123456', SALT),
       tipo: 'vendedor',
+      indicadorId: v1.id,
+      nivelId: nivelPrata.id,
     },
-    update: {},
+    update: { indicadorId: v1.id, nivelId: nivelPrata.id },
   });
-  console.log('✓ Vendedores: vendedor1@credflow.com, vendedor2@credflow.com (senha: 123456)');
+  console.log('✓ Vendedores: Carlos (raiz, Ouro), Ana (indicada por Carlos, Prata)');
 
-  // ——— Prepostos ———
+  // ——— Prepostos: João indicado por Carlos, Maria indicada por Ana ———
   const p1 = await prisma.usuario.upsert({
     where: { email: 'preposto1@credflow.com' },
     create: {
@@ -92,10 +96,12 @@ async function main() {
       senhaHash: await bcrypt.hash('123456', SALT),
       tipo: 'preposto',
       vendedorPaiId: v1.id,
+      indicadorId: v1.id,
+      nivelId: nivelBronze.id,
     },
-    update: {},
+    update: { indicadorId: v1.id, nivelId: nivelBronze.id },
   });
-  await prisma.usuario.upsert({
+  const p2 = await prisma.usuario.upsert({
     where: { email: 'preposto2@credflow.com' },
     create: {
       nome: 'Maria Preposta',
@@ -103,10 +109,89 @@ async function main() {
       senhaHash: await bcrypt.hash('123456', SALT),
       tipo: 'preposto',
       vendedorPaiId: v2.id,
+      indicadorId: v2.id,
+      nivelId: nivelBronze.id,
     },
-    update: {},
+    update: { indicadorId: v2.id, nivelId: nivelBronze.id },
   });
-  console.log('✓ Prepostos: preposto1@credflow.com (de Carlos), preposto2@credflow.com (de Ana) — senha: 123456');
+  console.log('✓ Prepostos: João (indicado por Carlos), Maria (indicada por Ana)');
+
+  // ——— Mais usuários para enriquecer a árvore de indicação ———
+  const v3 = await prisma.usuario.upsert({
+    where: { email: 'pedro@credflow.com' },
+    create: {
+      nome: 'Pedro Silva',
+      email: 'pedro@credflow.com',
+      senhaHash: await bcrypt.hash('123456', SALT),
+      tipo: 'vendedor',
+      indicadorId: p1.id,
+      nivelId: nivelBronze.id,
+    },
+    update: { indicadorId: p1.id, nivelId: nivelBronze.id },
+  });
+  const v4 = await prisma.usuario.upsert({
+    where: { email: 'fernanda@credflow.com' },
+    create: {
+      nome: 'Fernanda Costa',
+      email: 'fernanda@credflow.com',
+      senhaHash: await bcrypt.hash('123456', SALT),
+      tipo: 'vendedor',
+      indicadorId: v2.id,
+      nivelId: nivelPrata.id,
+    },
+    update: { indicadorId: v2.id, nivelId: nivelPrata.id },
+  });
+  const p3 = await prisma.usuario.upsert({
+    where: { email: 'lucia@credflow.com' },
+    create: {
+      nome: 'Lúcia Santos',
+      email: 'lucia@credflow.com',
+      senhaHash: await bcrypt.hash('123456', SALT),
+      tipo: 'preposto',
+      vendedorPaiId: v2.id,
+      indicadorId: p2.id,
+      nivelId: nivelBronze.id,
+    },
+    update: { indicadorId: p2.id, nivelId: nivelBronze.id },
+  });
+  const v5 = await prisma.usuario.upsert({
+    where: { email: 'ricardo@credflow.com' },
+    create: {
+      nome: 'Ricardo Oliveira',
+      email: 'ricardo@credflow.com',
+      senhaHash: await bcrypt.hash('123456', SALT),
+      tipo: 'vendedor',
+      indicadorId: v1.id,
+      nivelId: nivelPrata.id,
+    },
+    update: { indicadorId: v1.id, nivelId: nivelPrata.id },
+  });
+  const p4 = await prisma.usuario.upsert({
+    where: { email: 'beatriz@credflow.com' },
+    create: {
+      nome: 'Beatriz Lima',
+      email: 'beatriz@credflow.com',
+      senhaHash: await bcrypt.hash('123456', SALT),
+      tipo: 'preposto',
+      vendedorPaiId: v1.id,
+      indicadorId: v5.id,
+      nivelId: nivelBronze.id,
+    },
+    update: { indicadorId: v5.id, nivelId: nivelBronze.id },
+  });
+  const v6 = await prisma.usuario.upsert({
+    where: { email: 'gustavo@credflow.com' },
+    create: {
+      nome: 'Gustavo Mendes',
+      email: 'gustavo@credflow.com',
+      senhaHash: await bcrypt.hash('123456', SALT),
+      tipo: 'vendedor',
+      indicadorId: v3.id,
+      nivelId: nivelBronze.id,
+    },
+    update: { indicadorId: v3.id, nivelId: nivelBronze.id },
+  });
+  console.log('✓ Indicações: Pedro←João, Fernanda←Ana, Lúcia←Maria, Ricardo←Carlos, Beatriz←Ricardo, Gustavo←Pedro (senha: 123456)');
 
   // ——— Clientes ———
   const clientesData = [
@@ -202,8 +287,8 @@ async function main() {
 
   console.log('\n✅ Seed concluído. Contas para teste:');
   console.log('   Admin:    admin@credflow.com / admin123');
-  console.log('   Vendedor: vendedor1@credflow.com ou vendedor2@credflow.com / 123456');
-  console.log('   Preposto: preposto1@credflow.com ou preposto2@credflow.com / 123456');
+  console.log('   Árvore:   Carlos (raiz) → Ana, João, Ricardo → Fernanda, Maria, Pedro, Beatriz → Lúcia, Gustavo');
+  console.log('   Todos usuários (exceto admin): senha 123456');
   console.log('   Link cliente: /acompanhar/LINK01 até LINK05');
 }
 
