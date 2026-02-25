@@ -241,7 +241,7 @@ export default function DashboardPage() {
           {(user?.nivel?.nome === 'OURO' || user?.nivel?.nome === 'PRATA') && (
             <div className="pt-4 border-t border-slate-100">
               <p className="text-slate-600 text-sm mb-2">
-                <strong>Links de indicação:</strong> Ouro indica Prata, Prata indica Bronze. Envie o link para a pessoa se cadastrar.
+                <strong>Links de indicação</strong> (somente Ouro e Prata): Ouro indica Prata, Prata indica Bronze. Envie o link para a pessoa se cadastrar.
               </p>
               <Link
                 href="/dashboard/bonus-saques"

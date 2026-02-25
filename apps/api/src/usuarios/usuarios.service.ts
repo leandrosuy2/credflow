@@ -204,7 +204,7 @@ export class UsuariosService {
     });
   }
 
-  /** Valida link de indicação (public). Retorna dados para exibir na tela de cadastro. */
+  /** Valida link de indicação (público). Apenas Ouro e Prata podem ter links: Ouro → Prata, Prata/Ouro → Bronze. */
   async getLinkIndicacao(indicadorId: string, nivelNome: string) {
     if (nivelNome !== 'PRATA' && nivelNome !== 'BRONZE') {
       throw new ForbiddenException('Nível deve ser PRATA ou BRONZE.');
@@ -214,6 +214,7 @@ export class UsuariosService {
       include: { nivel: { select: { nome: true } } },
     });
     if (!indicador) throw new ForbiddenException('Link inválido ou expirado.');
+    // Somente Ouro e Prata podem ter links: link Prata só para Ouro; link Bronze para Prata ou Ouro.
     const ok =
       (nivelNome === 'PRATA' && indicador.nivel?.nome === 'OURO') ||
       (nivelNome === 'BRONZE' && (indicador.nivel?.nome === 'PRATA' || indicador.nivel?.nome === 'OURO'));

@@ -87,7 +87,7 @@ export default function BonusSaquesPage() {
             Meus links de indicação
           </h3>
           <p className="text-slate-600 text-sm mb-4">
-            Envie o link abaixo para a pessoa se cadastrar. Você será o indicador e receberá bônus quando ela pagar.
+            Somente níveis Ouro e Prata possuem links de indicação. Envie o link abaixo para a pessoa se cadastrar; você será o indicador e receberá bônus quando ela pagar.
           </p>
           <div className="space-y-4">
             {nivelNome === 'OURO' && (
