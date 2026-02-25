@@ -39,32 +39,29 @@ cp "$ROOT/deploy/env.web" "$ROOT/apps/web/.env.local"
 
 echo "[OK] .env aplicados (deploy/env.database, env.api, env.web)"
 
-# 3. Criar banco MySQL (se não existir)
+# 3. Dependências (precisamos do Prisma para criar o banco)
 echo ""
-echo "[*] Criando banco de dados (se não existir)..."
+echo "[*] Instalando dependências..."
+pnpm install --frozen-lockfile 2>/dev/null || pnpm install
+
+# 4. Criar banco MySQL com Prisma (conecta no banco que você passou e cria o schema)
+echo ""
+echo "[*] Conectando e criando banco de dados (se não existir)..."
 DATABASE_URL=$(grep '^DATABASE_URL=' "$ROOT/packages/database/.env" | cut -d= -f2- | tr -d '"')
 MYSQL_ROOT_PASSWORD=$(grep '^MYSQL_ROOT_PASSWORD=' "$ROOT/packages/database/.env" | cut -d= -f2-)
 if [ -n "$DATABASE_URL" ] && [ -n "$MYSQL_ROOT_PASSWORD" ]; then
   MYSQL_HOST=$(echo "$DATABASE_URL" | sed -n 's|.*@\([^:]*\):\([0-9]*\)/.*|\1|p')
   MYSQL_PORT=$(echo "$DATABASE_URL" | sed -n 's|.*@[^:]*:\([0-9]*\)/.*|\1|p')
   MYSQL_DB=$(echo "$DATABASE_URL" | sed -n 's|.*/\([^?]*\).*|\1|p')
-  if command -v mysql &> /dev/null; then
-    if mysql -h "$MYSQL_HOST" -P "${MYSQL_PORT:-3306}" -u root -p"$MYSQL_ROOT_PASSWORD" -e "CREATE DATABASE IF NOT EXISTS \`$MYSQL_DB\`;" 2>/dev/null; then
-      echo "[OK] Banco \`$MYSQL_DB\` garantido."
-    else
-      echo "[AVISO] Não foi possível criar o banco (confira host/porta/root em deploy/env.database). Continuando..."
-    fi
+  ROOT_URL="mysql://root:${MYSQL_ROOT_PASSWORD}@${MYSQL_HOST}:${MYSQL_PORT}/mysql"
+  if (cd "$ROOT" && pnpm --filter @credflow/database exec prisma db execute --url "$ROOT_URL" --file "$ROOT/deploy/create-db.sql" 2>/dev/null); then
+    echo "[OK] Banco \`$MYSQL_DB\` garantido (conectado em $MYSQL_HOST:$MYSQL_PORT)."
   else
-    echo "[AVISO] Cliente 'mysql' não instalado. Crie o banco manualmente ou instale: apt-get install mysql-client"
+    echo "[AVISO] Não foi possível criar o banco (confira DATABASE_URL e MYSQL_ROOT_PASSWORD em deploy/env.database). Continuando..."
   fi
 else
-  echo "[AVISO] DATABASE_URL ou MYSQL_ROOT_PASSWORD não definidos em packages/database/.env. Pulando criação do banco."
+  echo "[AVISO] DATABASE_URL ou MYSQL_ROOT_PASSWORD não definidos. Pulando criação do banco."
 fi
-
-# 4. Dependências
-echo ""
-echo "[*] Instalando dependências..."
-pnpm install --frozen-lockfile 2>/dev/null || pnpm install
 
 # 5. Prisma generate (usa packages/database/.env)
 echo ""
