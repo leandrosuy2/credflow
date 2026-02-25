@@ -10,11 +10,13 @@ const navVendedor = [
   { href: '/dashboard', label: 'Início' },
   { href: '/dashboard/clientes', label: 'Clientes' },
   { href: '/dashboard/prepostos', label: 'Prepostos' },
+  { href: '/dashboard/bonus-saques', label: 'Bônus e Saques' },
 ];
 
 const navPreposto = [
   { href: '/dashboard', label: 'Início' },
   { href: '/dashboard/clientes', label: 'Clientes' },
+  { href: '/dashboard/bonus-saques', label: 'Bônus e Saques' },
 ];
 
 const navAdmin = [
@@ -23,6 +25,13 @@ const navAdmin = [
   { href: '/dashboard/admin/vendedores', label: 'Vendedores' },
   { href: '/dashboard/admin/pagamentos', label: 'Pagamentos' },
   { href: '/dashboard/admin/comissoes', label: 'Comissões' },
+  { href: '/dashboard/admin/niveis', label: 'Níveis' },
+  { href: '/dashboard/admin/pagamentos-usuario', label: 'Pagamentos (adesão)' },
+  { href: '/dashboard/admin/bonus', label: 'Bônus' },
+  { href: '/dashboard/admin/saques', label: 'Saques' },
+  { href: '/dashboard/admin/arvore-indicacao', label: 'Árvore de Indicação' },
+  { href: '/dashboard/admin/auditoria', label: 'Auditoria' },
+  { href: '/dashboard/admin/relatorios', label: 'Relatórios' },
 ];
 
 export default function DashboardLayout({

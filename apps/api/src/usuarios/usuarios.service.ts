@@ -1,13 +1,17 @@
 import { Injectable, ForbiddenException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma.service';
+import { AuditService } from '../audit/audit.service';
 import { TipoUsuario, Usuario } from '@credflow/database';
 
 const SALT_ROUNDS = 10;
 
 @Injectable()
 export class UsuariosService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
   async create(data: {
     nome: string;
@@ -15,6 +19,8 @@ export class UsuariosService {
     senha: string;
     tipo: TipoUsuario;
     vendedorPaiId?: string;
+    indicadorId?: string;
+    nivelId?: string;
   }) {
     const senhaHash = await bcrypt.hash(data.senha, SALT_ROUNDS);
     return this.prisma.usuario.create({
@@ -24,8 +30,20 @@ export class UsuariosService {
         senhaHash,
         tipo: data.tipo,
         vendedorPaiId: data.vendedorPaiId || null,
+        indicadorId: data.indicadorId || null,
+        nivelId: data.nivelId || null,
       },
-      select: { id: true, nome: true, email: true, tipo: true, vendedorPaiId: true, status: true, dataCriacao: true },
+      select: {
+        id: true,
+        nome: true,
+        email: true,
+        tipo: true,
+        vendedorPaiId: true,
+        indicadorId: true,
+        nivelId: true,
+        status: true,
+        dataCriacao: true,
+      },
     });
   }
 
@@ -38,9 +56,13 @@ export class UsuariosService {
         email: true,
         tipo: true,
         vendedorPaiId: true,
+        indicadorId: true,
+        nivelId: true,
         status: true,
         dataCriacao: true,
-        _count: { select: { clientes: true, vendas: true } },
+        indicador: { select: { id: true, nome: true, email: true } },
+        nivel: { select: { id: true, nome: true } },
+        _count: { select: { clientes: true, vendas: true, indicados: true } },
       },
       orderBy: { dataCriacao: 'desc' },
     });
@@ -63,7 +85,13 @@ export class UsuariosService {
   async findOne(id: string) {
     return this.prisma.usuario.findUniqueOrThrow({
       where: { id },
-      include: { prepostos: true, _count: { select: { clientes: true, vendas: true } } },
+      include: {
+        prepostos: true,
+        indicador: { select: { id: true, nome: true, email: true } },
+        indicados: { select: { id: true, nome: true, email: true, nivel: { select: { nome: true } } } },
+        nivel: true,
+        _count: { select: { clientes: true, vendas: true, indicados: true } },
+      },
     });
   }
 
@@ -73,17 +101,42 @@ export class UsuariosService {
     return { success: true };
   }
 
-  async update(id: string, data: Partial<{ nome: string; email: string; senha: string; status: string }>) {
+  async update(
+    id: string,
+    data: Partial<{ nome: string; email: string; senha: string; status: string; indicadorId?: string; nivelId?: string }>,
+    adminId?: string,
+  ) {
+    const anterior = await this.prisma.usuario.findUnique({
+      where: { id },
+      select: { nome: true, email: true, status: true, indicadorId: true, nivelId: true },
+    });
     const update: Record<string, unknown> = {};
     if (data.nome != null) update.nome = data.nome;
     if (data.email != null) update.email = data.email.toLowerCase();
     if (data.status != null) update.status = data.status;
+    if (data.indicadorId !== undefined) update.indicadorId = data.indicadorId || null;
+    if (data.nivelId !== undefined) update.nivelId = data.nivelId || null;
     if (data.senha != null) update.senhaHash = await bcrypt.hash(data.senha, SALT_ROUNDS);
-    return this.prisma.usuario.update({
+
+    const atualizado = await this.prisma.usuario.update({
       where: { id },
       data: update as never,
-      select: { id: true, nome: true, email: true, tipo: true, status: true },
+      select: { id: true, nome: true, email: true, tipo: true, status: true, indicadorId: true, nivelId: true },
     });
+
+    if (adminId && anterior && (data.status != null || data.nivelId !== undefined)) {
+      await this.audit.log({
+        entidade: 'Usuario',
+        entidadeId: id,
+        acao: 'UPDATE',
+        usuarioAdminId: adminId,
+        valorAnterior: JSON.stringify(anterior),
+        valorNovo: JSON.stringify(atualizado),
+        detalhes: data.status != null ? `Status alterado para ${data.status}` : 'Dados alterados',
+      });
+    }
+
+    return atualizado;
   }
 
   /** Prepostos do vendedor logado (só vendedor pode ter prepostos). */
@@ -109,6 +162,51 @@ export class UsuariosService {
       tipo: 'preposto',
       vendedorPaiId: vendedorId,
     });
+  }
+
+  /** Árvore de indicação (quem indicou quem) - para admin. */
+  async arvoreIndicacao(): Promise<Array<{ id: string; nome: string; email: string; tipo: string; nivel?: string; indicados: unknown[] }>> {
+    const raizes = await this.prisma.usuario.findMany({
+      where: { indicadorId: null, tipo: { not: 'admin' } },
+      select: {
+        id: true,
+        nome: true,
+        email: true,
+        tipo: true,
+        nivel: { select: { nome: true } },
+      },
+      orderBy: { dataCriacao: 'asc' },
+    });
+    const build = async (userId: string): Promise<unknown[]> => {
+      const filhos = await this.prisma.usuario.findMany({
+        where: { indicadorId: userId },
+        select: {
+          id: true,
+          nome: true,
+          email: true,
+          tipo: true,
+          nivel: { select: { nome: true } },
+        },
+        orderBy: { dataCriacao: 'asc' },
+      });
+      return Promise.all(
+        filhos.map(async (f) => ({
+          ...f,
+          nivel: f.nivel?.nome,
+          indicados: await build(f.id),
+        })),
+      );
+    };
+    return Promise.all(
+      raizes.map(async (r) => ({
+        id: r.id,
+        nome: r.nome,
+        email: r.email,
+        tipo: r.tipo,
+        nivel: r.nivel?.nome,
+        indicados: await build(r.id),
+      })),
+    );
   }
 
   /** IDs de vendedores que este usuário pode ver (ele mesmo ou seus prepostos). */

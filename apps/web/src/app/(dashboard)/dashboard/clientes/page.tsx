@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { User, Mail, Phone, CreditCard, DollarSign, Link2, Copy } from 'lucide-react';
+import { User, Mail, Phone, CreditCard, DollarSign, Link2, Copy, Download } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { clientesApi } from '@/lib/api';
 import { Modal } from '@/components/ui/Modal';
@@ -11,6 +11,7 @@ import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { InputIcon } from '@/components/ui/InputIcon';
 import { toasts } from '@/lib/toast';
+import { exportToCsv, type CsvColumn } from '@/lib/exportCsv';
 
 type Cliente = {
   id: string;
@@ -50,6 +51,7 @@ export default function ClientesPage() {
   const [submitLoading, setSubmitLoading] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
   const [linkCriado, setLinkCriado] = useState<string | null>(null);
+  const [filtrosAdmin, setFiltrosAdmin] = useState({ dataInicio: '', dataFim: '', statusProcesso: '' });
   const isAdmin = user?.tipo === 'admin';
 
   const copiarLink = (link: string) => {
@@ -57,7 +59,16 @@ export default function ClientesPage() {
     navigator.clipboard.writeText(url).then(() => toasts.success('Link copiado! Envie ao cliente.'));
   };
 
-  const load = () => clientesApi.list().then((data) => setClientes((data as Cliente[]) || [])).finally(() => setLoading(false));
+  const load = () => {
+    const params = isAdmin && (filtrosAdmin.dataInicio || filtrosAdmin.dataFim || filtrosAdmin.statusProcesso)
+      ? {
+          dataInicio: filtrosAdmin.dataInicio || undefined,
+          dataFim: filtrosAdmin.dataFim || undefined,
+          statusProcesso: filtrosAdmin.statusProcesso || undefined,
+        }
+      : undefined;
+    return clientesApi.list(params).then((data) => setClientes((data as Cliente[]) || [])).finally(() => setLoading(false));
+  };
 
   useEffect(() => {
     load();
@@ -227,6 +238,37 @@ export default function ClientesPage() {
           <User className="w-5 h-5" /> Novo cliente
         </button>
       </div>
+
+      {isAdmin && (
+        <div className="flex flex-wrap items-center gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
+          <span className="text-sm font-medium text-slate-600">Filtros (relatório):</span>
+          <input type="date" value={filtrosAdmin.dataInicio} onChange={(e) => setFiltrosAdmin((f) => ({ ...f, dataInicio: e.target.value }))} className="px-2 py-1.5 border border-slate-300 rounded-lg text-sm" />
+          <input type="date" value={filtrosAdmin.dataFim} onChange={(e) => setFiltrosAdmin((f) => ({ ...f, dataFim: e.target.value }))} className="px-2 py-1.5 border border-slate-300 rounded-lg text-sm" />
+          <select value={filtrosAdmin.statusProcesso} onChange={(e) => setFiltrosAdmin((f) => ({ ...f, statusProcesso: e.target.value }))} className="px-2 py-1.5 border border-slate-300 rounded-lg text-sm">
+            <option value="">Todos os status</option>
+            {Object.entries(statusLabel).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+          <button type="button" onClick={() => load()} className="px-3 py-1.5 rounded-lg bg-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-300">Filtrar</button>
+          <button
+            type="button"
+            onClick={() => {
+              const cols: CsvColumn<Cliente>[] = [
+                { key: 'nome', label: 'Nome' },
+                { key: 'email', label: 'E-mail' },
+                { key: 'telefone', label: 'Telefone' },
+                { key: 'statusProcesso', label: 'Status', getValue: (r) => statusLabel[r.statusProcesso] ?? r.statusProcesso },
+                { key: 'valorServico', label: 'Valor', getValue: (r) => (typeof r.valorServico === 'number' ? r.valorServico : Number(String(r.valorServico))).toFixed(2) },
+                { key: 'dataCadastro', label: 'Data cadastro', getValue: (r) => new Date(r.dataCadastro).toLocaleString('pt-BR') },
+              ];
+              exportToCsv(clientes, cols, `clientes-${new Date().toISOString().slice(0, 10)}.csv`, { excel: true });
+              toasts.success('Relatório exportado.');
+            }}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-teal-600 text-white text-sm font-medium hover:bg-teal-700"
+          >
+            <Download className="w-4 h-4" /> Exportar CSV/Excel
+          </button>
+        </div>
+      )}
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 md:p-6">
         <DataTable<Cliente>

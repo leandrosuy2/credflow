@@ -58,10 +58,17 @@ export class ClientesService {
     return cliente;
   }
 
-  async findAll(user: Usuario) {
+  async findAll(user: Usuario, filtros?: { dataInicio?: Date; dataFim?: Date; statusProcesso?: string }) {
     const ids = await this.usuarios.vendedorIdsPermitidos(user);
+    const where: Record<string, unknown> = { vendedorId: { in: ids } };
+    if (filtros?.dataInicio || filtros?.dataFim) {
+      where.dataCadastro = {};
+      if (filtros.dataInicio) (where.dataCadastro as Record<string, Date>).gte = filtros.dataInicio;
+      if (filtros.dataFim) (where.dataCadastro as Record<string, Date>).lte = filtros.dataFim;
+    }
+    if (filtros?.statusProcesso) where.statusProcesso = filtros.statusProcesso;
     return this.prisma.cliente.findMany({
-      where: { vendedorId: { in: ids } },
+      where,
       include: {
         vendedor: { select: { id: true, nome: true } },
         vendas: { take: 1, orderBy: { dataVenda: 'desc' } },

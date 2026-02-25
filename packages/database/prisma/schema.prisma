@@ -7,6 +7,22 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ========== NÍVEIS (Bronze, Prata, Ouro) ==========
+model Nivel {
+  id           String   @id @default(cuid())
+  nome         String   @unique // BRONZE, PRATA, OURO
+  valorAdesao  Decimal  @map("valor_adesao") @db.Decimal(10, 2)
+  valorBonus   Decimal  @map("valor_bonus") @db.Decimal(10, 2) // bônus para o indicador quando indicado paga
+  ordem        Int      @default(0) // 1=Bronze, 2=Prata, 3=Ouro
+  dataCriacao  DateTime @default(now()) @map("data_criacao")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  usuarios           Usuario[]           @relation("UsuarioNivel")
+  pagamentosUsuario  PagamentoUsuario[]
+
+  @@map("niveis")
+}
+
 // ========== USUÁRIOS (admin | vendedor | preposto) ==========
 model Usuario {
   id              String    @id @default(cuid())
@@ -15,14 +31,23 @@ model Usuario {
   senhaHash       String    @map("senha_hash")
   tipo            TipoUsuario
   vendedorPaiId   String?   @map("vendedor_pai_id")
+  indicadorId     String?   @map("indicador_id") // quem indicou este usuário (árvore de indicação)
+  nivelId         String?   @map("nivel_id")
   status          StatusUsuario @default(ATIVO)
   dataCriacao     DateTime  @default(now()) @map("data_criacao")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
   vendedorPai     Usuario?  @relation("Prepostos", fields: [vendedorPaiId], references: [id], onDelete: SetNull)
   prepostos       Usuario[] @relation("Prepostos")
+  indicador       Usuario?  @relation("Indicacoes", fields: [indicadorId], references: [id], onDelete: SetNull)
+  indicados       Usuario[] @relation("Indicacoes")
+  nivel           Nivel?    @relation("UsuarioNivel", fields: [nivelId], references: [id], onDelete: SetNull)
   clientes        Cliente[]
   vendas          Venda[]   @relation("VendasVendedor")
+  pagamentosUsuario PagamentoUsuario[]
+  bonusesRecebidos Bonus[]  @relation("BonusBeneficiario")
+  saques          Saque[]
+  auditLogs       AuditLog[] @relation("AuditLogUsuario")
 
   @@map("usuarios")
 }
@@ -109,6 +134,7 @@ model Pagamento {
   updatedAt       DateTime        @updatedAt @map("updated_at")
 
   cliente         Cliente         @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  bonuses         Bonus[]         // bônus gerados para indicador do vendedor quando este cliente paga
 
   @@map("pagamentos")
 }
@@ -134,4 +160,93 @@ model Config {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("config")
+}
+
+// ========== PAGAMENTO DO USUÁRIO (adesão ao nível) - gera bônus para indicador ==========
+model PagamentoUsuario {
+  id              String    @id @default(cuid())
+  usuarioId       String    @map("usuario_id")
+  nivelId         String    @map("nivel_id")
+  valor           Decimal   @map("valor") @db.Decimal(10, 2)
+  status          StatusPagamento @default(PENDENTE)
+  formaPagamento  String?   @map("forma_pagamento")
+  gatewayId       String?   @map("gateway_id")
+  dataPagamento   DateTime? @map("data_pagamento")
+  dataCriacao     DateTime  @default(now()) @map("data_criacao")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  usuario         Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  nivel           Nivel     @relation(fields: [nivelId], references: [id], onDelete: Restrict)
+  bonuses         Bonus[]
+
+  @@map("pagamentos_usuario")
+}
+
+// ========== BÔNUS (gerado para indicador quando indicado paga) ==========
+model Bonus {
+  id                    String    @id @default(cuid())
+  beneficiarioId        String    @map("beneficiario_id") // indicador que recebe
+  pagamentoUsuarioId    String?   @map("pagamento_usuario_id") // pagamento do usuário indicado que gerou
+  pagamentoId            String?   @map("pagamento_id") // ou pagamento do cliente (vendedor indicado vendeu)
+  valor                 Decimal   @map("valor") @db.Decimal(10, 2)
+  status                StatusBonus @default(PENDENTE)
+  dataGeracao           DateTime  @default(now()) @map("data_geracao")
+  dataPagamento         DateTime? @map("data_pagamento")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  beneficiario          Usuario   @relation("BonusBeneficiario", fields: [beneficiarioId], references: [id], onDelete: Cascade)
+  pagamentoUsuario      PagamentoUsuario? @relation(fields: [pagamentoUsuarioId], references: [id], onDelete: Cascade)
+  pagamento             Pagamento? @relation(fields: [pagamentoId], references: [id], onDelete: Cascade)
+
+  @@map("bonus")
+}
+
+enum StatusBonus {
+  PENDENTE
+  PAGO
+  CANCELADO
+}
+
+// ========== SOLICITAÇÃO DE SAQUE (somente às quintas-feiras, aprovação admin) ==========
+model Saque {
+  id              String        @id @default(cuid())
+  usuarioId       String        @map("usuario_id")
+  valor           Decimal       @map("valor") @db.Decimal(10, 2)
+  status          StatusSaque   @default(PENDENTE)
+  dataSolicitacao DateTime      @default(now()) @map("data_solicitacao")
+  dataAprovacao   DateTime?     @map("data_aprovacao")
+  dataPagamento   DateTime?     @map("data_pagamento")
+  motivoRecusa    String?       @map("motivo_recusa")
+  observacaoAdmin String?       @map("observacao_admin")
+  dataCriacao     DateTime      @default(now()) @map("data_criacao")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  usuario         Usuario      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@map("saques")
+}
+
+enum StatusSaque {
+  PENDENTE
+  APROVADO
+  PAGO
+  CANCELADO
+}
+
+// ========== AUDITORIA (nenhum valor alterado sem registro) ==========
+model AuditLog {
+  id              String   @id @default(cuid())
+  entidade        String   @map("entidade") // Usuario, Bonus, Saque, Nivel, Config, etc.
+  entidadeId      String   @map("entidade_id")
+  campo           String?  @map("campo")
+  valorAnterior   String?  @map("valor_anterior") @db.Text
+  valorNovo       String?  @map("valor_novo") @db.Text
+  acao            String   @map("acao") // CREATE, UPDATE, DELETE, APROVAR_SAQUE, etc.
+  usuarioAdminId  String?  @map("usuario_admin_id")
+  data            DateTime @default(now()) @map("data")
+  detalhes        String?  @map("detalhes") @db.Text
+
+  usuarioAdmin    Usuario? @relation("AuditLogUsuario", fields: [usuarioAdminId], references: [id], onDelete: SetNull)
+
+  @@map("audit_log")
 }

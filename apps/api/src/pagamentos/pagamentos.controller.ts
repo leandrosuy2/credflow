@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -13,8 +13,16 @@ export class PagamentosController {
   @Get()
   @UseGuards(RolesGuard)
   @Roles(TipoUsuario.admin)
-  listarTodos() {
-    return this.pagamentos.listarTodos();
+  listarTodos(
+    @Query('dataInicio') dataInicio?: string,
+    @Query('dataFim') dataFim?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.pagamentos.listarTodos({
+      dataInicio: dataInicio ? new Date(dataInicio) : undefined,
+      dataFim: dataFim ? new Date(dataFim) : undefined,
+      status,
+    });
   }
 
   @Get('cliente/:clienteId')

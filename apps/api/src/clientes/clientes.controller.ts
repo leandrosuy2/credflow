@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ClientesService } from './clientes.service';
@@ -20,8 +20,17 @@ export class ClientesController {
   }
 
   @Get()
-  findAll(@CurrentUser() user: Usuario) {
-    return this.clientes.findAll(user);
+  findAll(
+    @CurrentUser() user: Usuario,
+    @Query('dataInicio') dataInicio?: string,
+    @Query('dataFim') dataFim?: string,
+    @Query('statusProcesso') statusProcesso?: string,
+  ) {
+    return this.clientes.findAll(user, {
+      dataInicio: dataInicio ? new Date(dataInicio) : undefined,
+      dataFim: dataFim ? new Date(dataFim) : undefined,
+      statusProcesso: statusProcesso as StatusProcesso | undefined,
+    });
   }
 
   @Get(':id')

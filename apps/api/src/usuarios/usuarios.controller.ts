@@ -35,6 +35,13 @@ export class UsuariosController {
     return this.usuarios.findVendedores();
   }
 
+  @Get('arvore-indicacao')
+  @UseGuards(RolesGuard)
+  @Roles(TipoUsuario.admin)
+  arvoreIndicacao() {
+    return this.usuarios.arvoreIndicacao();
+  }
+
   /** Lista prepostos do vendedor logado (só vendedor). */
   @Get('prepostos')
   @UseGuards(RolesGuard)
@@ -70,9 +77,10 @@ export class UsuariosController {
   @Roles(TipoUsuario.admin)
   update(
     @Param('id') id: string,
-    @Body() body: { nome?: string; email?: string; senha?: string; status?: string },
+    @Body() body: { nome?: string; email?: string; senha?: string; status?: string; indicadorId?: string; nivelId?: string },
+    @CurrentUser() user: Usuario,
   ) {
-    return this.usuarios.update(id, body);
+    return this.usuarios.update(id, body, user.id);
   }
 
   @Delete(':id')

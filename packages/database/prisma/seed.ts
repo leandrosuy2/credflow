@@ -8,6 +8,24 @@ const SALT = 10;
 async function main() {
   console.log('🌱 Seed CredFlow (teste)...\n');
 
+  // ——— Níveis (Bronze, Prata, Ouro) ———
+  await prisma.nivel.upsert({
+    where: { nome: 'BRONZE' },
+    create: { nome: 'BRONZE', valorAdesao: 200, valorBonus: 100, ordem: 1 },
+    update: { valorAdesao: 200, valorBonus: 100, ordem: 1 },
+  });
+  await prisma.nivel.upsert({
+    where: { nome: 'PRATA' },
+    create: { nome: 'PRATA', valorAdesao: 300, valorBonus: 150, ordem: 2 },
+    update: { valorAdesao: 300, valorBonus: 150, ordem: 2 },
+  });
+  await prisma.nivel.upsert({
+    where: { nome: 'OURO' },
+    create: { nome: 'OURO', valorAdesao: 500, valorBonus: 250, ordem: 3 },
+    update: { valorAdesao: 500, valorBonus: 250, ordem: 3 },
+  });
+  console.log('✓ Níveis: Bronze (R$200/ R$100), Prata (R$300/ R$150), Ouro (R$500/ R$250)');
+
   // ——— Config (comissões) ———
   await prisma.config.upsert({
     where: { chave: 'COMISSAO_VENDEDOR' },
@@ -19,7 +37,12 @@ async function main() {
     create: { chave: 'COMISSAO_PREPOSTO', valor: '5' },
     update: { valor: '5' },
   });
-  console.log('✓ Config comissões (20% / 5%)');
+  await prisma.config.upsert({
+    where: { chave: 'BONUS_INDICADOR_VALOR' },
+    create: { chave: 'BONUS_INDICADOR_VALOR', valor: '100' },
+    update: { valor: '100' },
+  });
+  console.log('✓ Config comissões (20% / 5%) e bônus indicador (R$ 100)');
 
   // ——— Admin ———
   let admin = await prisma.usuario.findFirst({ where: { tipo: 'admin' } });

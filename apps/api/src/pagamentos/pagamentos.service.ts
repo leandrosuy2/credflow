@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../prisma.service';
 import { VendasService } from '../vendas/vendas.service';
+import { BonusService } from '../bonus/bonus.service';
 import { StatusProcesso } from '@credflow/database';
 
 @Injectable()
@@ -9,6 +10,7 @@ export class PagamentosService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly vendas: VendasService,
+    private readonly bonus: BonusService,
   ) {}
 
   async criarPorCliente(clienteId: string, valor: number, formaPagamento: string, gatewayId?: string) {
@@ -61,6 +63,11 @@ export class PagamentosService {
       }),
     ]);
     await this.vendas.registrarVendaPorPagamento(pagamento.clienteId);
+    await this.bonus.gerarPorPagamentoCliente(
+      pagamentoId,
+      pagamento.cliente.vendedorId,
+      Number(pagamento.valor),
+    );
     return this.prisma.pagamento.findUniqueOrThrow({ where: { id: pagamentoId } });
   }
 
@@ -71,9 +78,17 @@ export class PagamentosService {
     });
   }
 
-  async listarTodos() {
+  async listarTodos(filtros?: { dataInicio?: Date; dataFim?: Date; status?: string }) {
+    const where: Record<string, unknown> = {};
+    if (filtros?.status) where.status = filtros.status;
+    if (filtros?.dataInicio || filtros?.dataFim) {
+      where.dataCriacao = {};
+      if (filtros.dataInicio) (where.dataCriacao as Record<string, Date>).gte = filtros.dataInicio;
+      if (filtros.dataFim) (where.dataCriacao as Record<string, Date>).lte = filtros.dataFim;
+    }
     return this.prisma.pagamento.findMany({
-      include: { cliente: { select: { nome: true, email: true } } },
+      where,
+      include: { cliente: { select: { nome: true, email: true, valorServico: true } } },
       orderBy: { dataCriacao: 'desc' },
     });
   }
