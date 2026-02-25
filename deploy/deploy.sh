@@ -44,7 +44,30 @@ echo ""
 echo "[*] Instalando dependências..."
 pnpm install --frozen-lockfile 2>/dev/null || pnpm install
 
-# 4. Criar banco MySQL com Prisma (conecta no banco que você passou e cria o schema)
+# 4. MySQL client (instala se não existir) e criar banco
+echo ""
+if ! command -v mysql &> /dev/null; then
+  echo "[*] Cliente MySQL não encontrado. Instalando..."
+  if command -v apt-get &> /dev/null; then
+    export DEBIAN_FRONTEND=noninteractive
+    if sudo -n true 2>/dev/null; then
+      sudo apt-get update -qq && sudo apt-get install -y -qq default-mysql-client || sudo apt-get install -y -qq mysql-client
+    else
+      apt-get update -qq && apt-get install -y -qq default-mysql-client 2>/dev/null || apt-get install -y -qq mysql-client 2>/dev/null || \
+      echo "[AVISO] Rode com sudo para instalar: sudo apt-get install default-mysql-client"
+    fi
+  elif command -v apk &> /dev/null; then
+    (sudo -n true 2>/dev/null && sudo apk add --no-cache mysql-client) || \
+    (apk add --no-cache mysql-client 2>/dev/null) || \
+    echo "[AVISO] Rode com sudo ou instale: apk add mysql-client"
+  else
+    echo "[AVISO] Instale o cliente MySQL (apt-get install default-mysql-client ou apk add mysql-client)."
+  fi
+fi
+if command -v mysql &> /dev/null; then
+  echo "[OK] MySQL client disponível."
+fi
+
 echo ""
 echo "[*] Conectando e criando banco de dados (se não existir)..."
 DATABASE_URL=$(grep '^DATABASE_URL=' "$ROOT/packages/database/.env" | cut -d= -f2- | tr -d '"')
@@ -53,11 +76,14 @@ if [ -n "$DATABASE_URL" ] && [ -n "$MYSQL_ROOT_PASSWORD" ]; then
   MYSQL_HOST=$(echo "$DATABASE_URL" | sed -n 's|.*@\([^:]*\):\([0-9]*\)/.*|\1|p')
   MYSQL_PORT=$(echo "$DATABASE_URL" | sed -n 's|.*@[^:]*:\([0-9]*\)/.*|\1|p')
   MYSQL_DB=$(echo "$DATABASE_URL" | sed -n 's|.*/\([^?]*\).*|\1|p')
-  ROOT_URL="mysql://root:${MYSQL_ROOT_PASSWORD}@${MYSQL_HOST}:${MYSQL_PORT}/mysql"
-  if (cd "$ROOT" && pnpm --filter @credflow/database exec prisma db execute --url "$ROOT_URL" --file "$ROOT/deploy/create-db.sql" 2>/dev/null); then
-    echo "[OK] Banco \`$MYSQL_DB\` garantido (conectado em $MYSQL_HOST:$MYSQL_PORT)."
+  if command -v mysql &> /dev/null; then
+    if mysql -h "$MYSQL_HOST" -P "${MYSQL_PORT:-3306}" -u root -p"$MYSQL_ROOT_PASSWORD" -e "CREATE DATABASE IF NOT EXISTS \`$MYSQL_DB\`;" 2>/dev/null; then
+      echo "[OK] Banco \`$MYSQL_DB\` garantido (conectado em $MYSQL_HOST:${MYSQL_PORT:-3306})."
+    else
+      echo "[AVISO] Não foi possível criar o banco (confira host/senha root em deploy/env.database). Continuando..."
+    fi
   else
-    echo "[AVISO] Não foi possível criar o banco (confira DATABASE_URL e MYSQL_ROOT_PASSWORD em deploy/env.database). Continuando..."
+    echo "[AVISO] Cliente mysql não disponível. Crie o banco \`$MYSQL_DB\` manualmente e rode o deploy de novo."
   fi
 else
   echo "[AVISO] DATABASE_URL ou MYSQL_ROOT_PASSWORD não definidos. Pulando criação do banco."
