@@ -89,6 +89,24 @@ else
   echo "[AVISO] DATABASE_URL ou MYSQL_ROOT_PASSWORD não definidos. Pulando criação do banco."
 fi
 
+echo ""
+echo "[*] Configurando usuário MySQL (mysql_native_password para o Prisma)..."
+DATABASE_URL=$(grep '^DATABASE_URL=' "$ROOT/packages/database/.env" | cut -d= -f2- | tr -d '"')
+MYSQL_ROOT_PASSWORD=$(grep '^MYSQL_ROOT_PASSWORD=' "$ROOT/packages/database/.env" | cut -d= -f2-)
+if [ -n "$DATABASE_URL" ] && [ -n "$MYSQL_ROOT_PASSWORD" ] && command -v mysql &> /dev/null; then
+  MYSQL_HOST=$(echo "$DATABASE_URL" | sed -n 's|.*@\([^:]*\):\([0-9]*\)/.*|\1|p')
+  MYSQL_PORT=$(echo "$DATABASE_URL" | sed -n 's|.*@[^:]*:\([0-9]*\)/.*|\1|p')
+  MYSQL_DB=$(echo "$DATABASE_URL" | sed -n 's|.*/\([^?]*\).*|\1|p')
+  MYSQL_USER=$(echo "$DATABASE_URL" | sed -n 's|mysql://\([^:]*\):.*|\1|p')
+  MYSQL_PASS=$(echo "$DATABASE_URL" | sed -n 's|mysql://[^:]*:\([^@]*\)@.*|\1|p')
+  SQL_AUTH="CREATE USER IF NOT EXISTS \`$MYSQL_USER\`@'localhost' IDENTIFIED WITH mysql_native_password BY '$MYSQL_PASS'; CREATE USER IF NOT EXISTS \`$MYSQL_USER\`@'%' IDENTIFIED WITH mysql_native_password BY '$MYSQL_PASS'; ALTER USER \`$MYSQL_USER\`@'localhost' IDENTIFIED WITH mysql_native_password BY '$MYSQL_PASS'; ALTER USER \`$MYSQL_USER\`@'%' IDENTIFIED WITH mysql_native_password BY '$MYSQL_PASS'; GRANT ALL PRIVILEGES ON \`$MYSQL_DB\`.* TO \`$MYSQL_USER\`@'localhost'; GRANT ALL PRIVILEGES ON \`$MYSQL_DB\`.* TO \`$MYSQL_USER\`@'%'; FLUSH PRIVILEGES;"
+  if mysql -h "$MYSQL_HOST" -P "${MYSQL_PORT:-3306}" -u root -p"$MYSQL_ROOT_PASSWORD" -e "$SQL_AUTH" 2>/dev/null; then
+    echo "[OK] Usuário $MYSQL_USER configurado (mysql_native_password)."
+  else
+    echo "[AVISO] Não foi possível configurar o usuário (confira senha root em deploy/env.database). Continuando..."
+  fi
+fi
+
 # 5. Prisma generate (usa packages/database/.env)
 echo ""
 echo "[*] Gerando Prisma Client..."

@@ -23,6 +23,16 @@ Isso é **permissão no MySQL**: o usuário `credflow` não está autorizado a c
 
 3. Se o MySQL estiver em outro servidor e o firewall bloquear a porta 3306, libere a porta **3306** para o IP da sua VPS.
 
+**Erro: "Unknown authentication plugin \`sha256_password\`"**
+
+O Prisma não suporta esse plugin. No MySQL, troque o usuário para `mysql_native_password`:
+
+```sql
+ALTER USER 'credflow'@'localhost' IDENTIFIED WITH mysql_native_password BY 'credflow';
+ALTER USER 'credflow'@'%' IDENTIFIED WITH mysql_native_password BY 'credflow';
+FLUSH PRIVILEGES;
+```
+
 Depois disso, rode de novo na VPS:
 
 ```bash
