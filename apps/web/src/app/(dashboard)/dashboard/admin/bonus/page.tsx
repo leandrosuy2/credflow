@@ -20,6 +20,9 @@ type Bonus = {
   pagamento?: { cliente?: { nome: string } };
 };
 
+/** Bonus com campos extras usados na busca da DataTable */
+type BonusRow = Bonus & { _beneficiarioNome?: string; _beneficiarioEmail?: string };
+
 type Nivel = { id: string; nome: string };
 type UsuarioOpt = { id: string; nome: string; email: string };
 
@@ -32,7 +35,7 @@ const formatDate = (s: string) => new Date(s).toLocaleString('pt-BR');
 export default function AdminBonusPage() {
   const { user } = useAuth();
   const router = useRouter();
-  const [lista, setLista] = useState<Bonus[]>([]);
+  const [lista, setLista] = useState<BonusRow[]>([]);
   const [resumo, setResumo] = useState<{ totalPendente: number; totalPago: number; quantidadePendente: number; quantidadePago: number } | null>(null);
   const [niveis, setNiveis] = useState<Nivel[]>([]);
   const [usuarios, setUsuarios] = useState<UsuarioOpt[]>([]);
@@ -49,7 +52,7 @@ export default function AdminBonusPage() {
     return Promise.all([
       bonusApi.adminTodos(Object.keys(params).length ? params : undefined).then((data) => {
         const items = (data as Bonus[]) || [];
-        setLista(items.map((b) => ({ ...b, _beneficiarioNome: b.beneficiario?.nome ?? '', _beneficiarioEmail: b.beneficiario?.email ?? '' })));
+        setLista(items.map((b): BonusRow => ({ ...b, _beneficiarioNome: b.beneficiario?.nome ?? '', _beneficiarioEmail: b.beneficiario?.email ?? '' })));
       }),
       bonusApi.adminResumo().then((data) => setResumo(data as { totalPendente: number; totalPago: number; quantidadePendente: number; quantidadePago: number })),
     ]);
@@ -69,7 +72,7 @@ export default function AdminBonusPage() {
   if (user?.tipo !== 'admin') return null;
   if (loading && !lista.length) return <div className="py-12 text-center text-slate-500">Carregando...</div>;
 
-  const columns: Column<Bonus>[] = [
+  const columns: Column<BonusRow>[] = [
     { key: 'beneficiario', label: 'Beneficiário', render: (r) => (
       <div>
         <span className="font-medium text-slate-800">{r.beneficiario?.nome ?? '—'}</span>
@@ -164,7 +167,7 @@ export default function AdminBonusPage() {
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 md:p-6">
-        <DataTable<Bonus>
+        <DataTable<BonusRow>
           data={lista}
           columns={columns}
           keyExtractor={(r) => r.id}
