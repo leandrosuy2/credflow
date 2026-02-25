@@ -72,38 +72,38 @@ echo ""
 echo "[*] Conectando e criando banco de dados (se não existir)..."
 DATABASE_URL=$(grep '^DATABASE_URL=' "$ROOT/packages/database/.env" | cut -d= -f2- | tr -d '"')
 MYSQL_ROOT_PASSWORD=$(grep '^MYSQL_ROOT_PASSWORD=' "$ROOT/packages/database/.env" | cut -d= -f2-)
-if [ -n "$DATABASE_URL" ] && [ -n "$MYSQL_ROOT_PASSWORD" ]; then
-  MYSQL_HOST=$(echo "$DATABASE_URL" | sed -n 's|.*@\([^:]*\):\([0-9]*\)/.*|\1|p')
-  MYSQL_PORT=$(echo "$DATABASE_URL" | sed -n 's|.*@[^:]*:\([0-9]*\)/.*|\1|p')
-  MYSQL_DB=$(echo "$DATABASE_URL" | sed -n 's|.*/\([^?]*\).*|\1|p')
-  if command -v mysql &> /dev/null; then
-    if mysql -h "$MYSQL_HOST" -P "${MYSQL_PORT:-3306}" -u root -p"$MYSQL_ROOT_PASSWORD" -e "CREATE DATABASE IF NOT EXISTS \`$MYSQL_DB\`;" 2>/dev/null; then
-      echo "[OK] Banco \`$MYSQL_DB\` garantido (conectado em $MYSQL_HOST:${MYSQL_PORT:-3306})."
-    else
-      echo "[AVISO] Não foi possível criar o banco (confira host/senha root em deploy/env.database). Continuando..."
-    fi
-  else
-    echo "[AVISO] Cliente mysql não disponível. Crie o banco \`$MYSQL_DB\` manualmente e rode o deploy de novo."
+MYSQL_HOST=$(echo "$DATABASE_URL" | sed -n 's|.*@\([^:]*\):\([0-9]*\)/.*|\1|p')
+MYSQL_PORT=$(echo "$DATABASE_URL" | sed -n 's|.*@[^:]*:\([0-9]*\)/.*|\1|p')
+MYSQL_DB=$(echo "$DATABASE_URL" | sed -n 's|.*/\([^?]*\).*|\1|p')
+MYSQL_USER=$(echo "$DATABASE_URL" | sed -n 's|mysql://\([^:]*\):.*|\1|p')
+MYSQL_PASS=$(echo "$DATABASE_URL" | sed -n 's|mysql://[^:]*:\([^@]*\)@.*|\1|p')
+
+# Descobrir como conectar como root: com senha ou sudo (auth_socket no Ubuntu)
+MYSQL_ROOT_CMD=""
+if [ -n "$DATABASE_URL" ] && command -v mysql &> /dev/null; then
+  if [ -n "$MYSQL_ROOT_PASSWORD" ] && mysql -h "$MYSQL_HOST" -P "${MYSQL_PORT:-3306}" -u root -p"$MYSQL_ROOT_PASSWORD" -e "SELECT 1;" 2>/dev/null; then
+    MYSQL_ROOT_CMD="mysql -h $MYSQL_HOST -P ${MYSQL_PORT:-3306} -u root -p$MYSQL_ROOT_PASSWORD"
+  elif sudo mysql -e "SELECT 1;" 2>/dev/null; then
+    MYSQL_ROOT_CMD="sudo mysql"
+  fi
+fi
+
+if [ -n "$MYSQL_ROOT_CMD" ] && [ -n "$MYSQL_DB" ]; then
+  if $MYSQL_ROOT_CMD -e "CREATE DATABASE IF NOT EXISTS \`$MYSQL_DB\`;" 2>/dev/null; then
+    echo "[OK] Banco \`$MYSQL_DB\` garantido."
   fi
 else
-  echo "[AVISO] DATABASE_URL ou MYSQL_ROOT_PASSWORD não definidos. Pulando criação do banco."
+  echo "[AVISO] Não foi possível conectar como root (tente senha em deploy/env.database ou rode o deploy com sudo)."
 fi
 
 echo ""
 echo "[*] Configurando usuário MySQL (mysql_native_password para o Prisma)..."
-DATABASE_URL=$(grep '^DATABASE_URL=' "$ROOT/packages/database/.env" | cut -d= -f2- | tr -d '"')
-MYSQL_ROOT_PASSWORD=$(grep '^MYSQL_ROOT_PASSWORD=' "$ROOT/packages/database/.env" | cut -d= -f2-)
-if [ -n "$DATABASE_URL" ] && [ -n "$MYSQL_ROOT_PASSWORD" ] && command -v mysql &> /dev/null; then
-  MYSQL_HOST=$(echo "$DATABASE_URL" | sed -n 's|.*@\([^:]*\):\([0-9]*\)/.*|\1|p')
-  MYSQL_PORT=$(echo "$DATABASE_URL" | sed -n 's|.*@[^:]*:\([0-9]*\)/.*|\1|p')
-  MYSQL_DB=$(echo "$DATABASE_URL" | sed -n 's|.*/\([^?]*\).*|\1|p')
-  MYSQL_USER=$(echo "$DATABASE_URL" | sed -n 's|mysql://\([^:]*\):.*|\1|p')
-  MYSQL_PASS=$(echo "$DATABASE_URL" | sed -n 's|mysql://[^:]*:\([^@]*\)@.*|\1|p')
+if [ -n "$MYSQL_ROOT_CMD" ] && [ -n "$MYSQL_USER" ] && [ -n "$MYSQL_PASS" ] && [ -n "$MYSQL_DB" ]; then
   SQL_AUTH="CREATE USER IF NOT EXISTS \`$MYSQL_USER\`@'localhost' IDENTIFIED WITH mysql_native_password BY '$MYSQL_PASS'; CREATE USER IF NOT EXISTS \`$MYSQL_USER\`@'%' IDENTIFIED WITH mysql_native_password BY '$MYSQL_PASS'; ALTER USER \`$MYSQL_USER\`@'localhost' IDENTIFIED WITH mysql_native_password BY '$MYSQL_PASS'; ALTER USER \`$MYSQL_USER\`@'%' IDENTIFIED WITH mysql_native_password BY '$MYSQL_PASS'; GRANT ALL PRIVILEGES ON \`$MYSQL_DB\`.* TO \`$MYSQL_USER\`@'localhost'; GRANT ALL PRIVILEGES ON \`$MYSQL_DB\`.* TO \`$MYSQL_USER\`@'%'; FLUSH PRIVILEGES;"
-  if mysql -h "$MYSQL_HOST" -P "${MYSQL_PORT:-3306}" -u root -p"$MYSQL_ROOT_PASSWORD" -e "$SQL_AUTH" 2>/dev/null; then
+  if $MYSQL_ROOT_CMD -e "$SQL_AUTH" 2>/dev/null; then
     echo "[OK] Usuário $MYSQL_USER configurado (mysql_native_password)."
   else
-    echo "[AVISO] Não foi possível configurar o usuário (confira senha root em deploy/env.database). Continuando..."
+    echo "[AVISO] Não foi possível configurar o usuário. Continuando..."
   fi
 fi
 
