@@ -1,0 +1,137 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ========== USUÁRIOS (admin | vendedor | preposto) ==========
+model Usuario {
+  id              String    @id @default(cuid())
+  nome            String
+  email           String    @unique
+  senhaHash       String    @map("senha_hash")
+  tipo            TipoUsuario
+  vendedorPaiId   String?   @map("vendedor_pai_id")
+  status          StatusUsuario @default(ATIVO)
+  dataCriacao     DateTime  @default(now()) @map("data_criacao")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  vendedorPai     Usuario?  @relation("Prepostos", fields: [vendedorPaiId], references: [id], onDelete: SetNull)
+  prepostos       Usuario[] @relation("Prepostos")
+  clientes        Cliente[]
+  vendas          Venda[]   @relation("VendasVendedor")
+
+  @@map("usuarios")
+}
+
+enum TipoUsuario {
+  admin
+  vendedor
+  preposto
+}
+
+enum StatusUsuario {
+  ATIVO
+  INATIVO
+}
+
+// ========== CLIENTES ==========
+model Cliente {
+  id                  String          @id @default(cuid())
+  nome                String
+  cpfCnpj             String          @map("cpf_cnpj")
+  telefone            String
+  email               String
+  valorServico        Decimal         @map("valor_servico") @db.Decimal(10, 2)
+  vendedorId          String          @map("vendedor_id")
+  prepostoId          String?         @map("preposto_id")
+  statusProcesso      StatusProcesso  @default(CADASTRO_RECEBIDO) @map("status_processo")
+  linkAcompanhamento  String          @unique @map("link_acompanhamento")
+  dataCadastro        DateTime        @default(now()) @map("data_cadastro")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+
+  vendedor            Usuario         @relation(fields: [vendedorId], references: [id], onDelete: Cascade)
+  vendas              Venda[]
+  pagamentos          Pagamento[]
+  historicoProcesso   HistoricoProcesso[]
+
+  @@map("clientes")
+}
+
+enum StatusProcesso {
+  CADASTRO_RECEBIDO
+  EM_ANALISE
+  EM_ANDAMENTO
+  AGUARDANDO_PAGAMENTO
+  PAGO
+  CONCLUIDO
+  CANCELADO
+}
+
+// ========== VENDAS (comissões) ==========
+model Venda {
+  id                String            @id @default(cuid())
+  clienteId         String            @map("cliente_id")
+  vendedorId        String            @map("vendedor_id")
+  prepostoId        String?           @map("preposto_id")
+  valorServico      Decimal           @map("valor_servico") @db.Decimal(10, 2)
+  comissaoVendedor  Decimal           @map("comissao_vendedor") @db.Decimal(10, 2)
+  comissaoPreposto  Decimal?          @map("comissao_preposto") @db.Decimal(10, 2)
+  statusPagamento   StatusPagamento   @default(PENDENTE) @map("status_pagamento")
+  dataVenda         DateTime         @default(now()) @map("data_venda")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+
+  cliente           Cliente          @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  vendedor          Usuario          @relation("VendasVendedor", fields: [vendedorId], references: [id], onDelete: Cascade)
+
+  @@map("vendas")
+}
+
+enum StatusPagamento {
+  PENDENTE
+  PAGO
+  CANCELADO
+}
+
+// ========== PAGAMENTOS ==========
+model Pagamento {
+  id              String          @id @default(cuid())
+  clienteId       String          @map("cliente_id")
+  valor           Decimal         @map("valor") @db.Decimal(10, 2)
+  formaPagamento  String          @map("forma_pagamento") // PIX, CARTAO, BOLETO
+  status          StatusPagamento @default(PENDENTE)
+  gatewayId       String?         @map("gateway_id") // ID no Asaas/Mercado Pago etc
+  dataPagamento   DateTime?       @map("data_pagamento")
+  dataCriacao     DateTime        @default(now()) @map("data_criacao")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  cliente         Cliente         @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@map("pagamentos")
+}
+
+// ========== HISTÓRICO DO PROCESSO (linha do tempo) ==========
+model HistoricoProcesso {
+  id              String        @id @default(cuid())
+  clienteId       String        @map("cliente_id")
+  status          String        @map("status") // mesmo StatusProcesso ou texto livre
+  descricao       String        @map("descricao")
+  dataAtualizacao DateTime      @default(now()) @map("data_atualizacao")
+
+  cliente         Cliente       @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@map("historico_processo")
+}
+
+// ========== CONFIGURAÇÃO (comissões e outros) ==========
+model Config {
+  id        String   @id @default(cuid())
+  chave     String   @unique @map("chave")
+  valor     String   @map("valor")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("config")
+}

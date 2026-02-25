@@ -1,0 +1,25 @@
+{
+  "name": "credflow",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CredFlow - Monorepo Next.js + NestJS",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "dev:web": "turbo run dev --filter=@credflow/web",
+    "dev:api": "turbo run dev --filter=@credflow/api",
+    "db:generate": "turbo run db:generate --filter=@credflow/database",
+    "db:push": "turbo run db:push --filter=@credflow/database",
+    "db:studio": "turbo run db:studio --filter=@credflow/database",
+    "db:seed": "turbo run db:seed --filter=@credflow/database"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.0"
+  },
+  "packageManager": "pnpm@9.14.2",
+  "engines": {
+    "node": ">=20"
+  }
+}
