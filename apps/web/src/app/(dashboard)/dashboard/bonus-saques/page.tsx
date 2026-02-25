@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Copy, Link2, Award } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import { bonusApi, saquesApi } from '@/lib/api';
 import { toasts } from '@/lib/toast';
 
@@ -12,6 +14,7 @@ function isQuintaFeira() {
 }
 
 export default function BonusSaquesPage() {
+  const { user } = useAuth();
   const [resumo, setResumo] = useState<{ totalPendente: number; totalPago: number } | null>(null);
   const [saldoDisponivel, setSaldoDisponivel] = useState<number | null>(null);
   const [saques, setSaques] = useState<unknown[]>([]);
@@ -60,9 +63,82 @@ export default function BonusSaquesPage() {
   const quinta = isQuintaFeira();
   const saldo = saldoDisponivel ?? 0;
 
+  const nivelNome = user?.nivel?.nome;
+  const linkPrata = typeof window !== 'undefined' && user?.id
+    ? `${window.location.origin}/cadastro/indicacao?indicador=${encodeURIComponent(user.id)}&nivel=PRATA`
+    : '';
+  const linkBronze = typeof window !== 'undefined' && user?.id
+    ? `${window.location.origin}/cadastro/indicacao?indicador=${encodeURIComponent(user.id)}&nivel=BRONZE`
+    : '';
+
+  const copiar = (url: string, label: string) => {
+    navigator.clipboard.writeText(url).then(() => toasts.success(`Link para cadastro ${label} copiado!`));
+  };
+
   return (
     <div className="space-y-8">
       <h2 className="text-2xl font-bold text-slate-800">Bônus e Saques</h2>
+
+      {/* Links de indicação: Ouro → Prata, Prata → Bronze */}
+      {(nivelNome === 'OURO' || nivelNome === 'PRATA') && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <h3 className="text-lg font-semibold text-slate-800 mb-1 flex items-center gap-2">
+            <Link2 className="w-5 h-5 text-teal-600" />
+            Meus links de indicação
+          </h3>
+          <p className="text-slate-600 text-sm mb-4">
+            Envie o link abaixo para a pessoa se cadastrar. Você será o indicador e receberá bônus quando ela pagar.
+          </p>
+          <div className="space-y-4">
+            {nivelNome === 'OURO' && (
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <p className="text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
+                  <Award className="w-4 h-4 text-slate-500" />
+                  Link para cadastro <strong>Prata</strong>
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={linkPrata}
+                    className="flex-1 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 text-sm font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => copiar(linkPrata, 'Prata')}
+                    className="px-4 py-2 rounded-lg bg-teal-600 text-white font-medium inline-flex items-center gap-2 hover:bg-teal-700"
+                  >
+                    <Copy className="w-4 h-4" /> Copiar
+                  </button>
+                </div>
+              </div>
+            )}
+            {(nivelNome === 'PRATA' || nivelNome === 'OURO') && (
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <p className="text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
+                  <Award className="w-4 h-4 text-amber-600" />
+                  Link para cadastro <strong>Bronze</strong>
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={linkBronze}
+                    className="flex-1 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 text-sm font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => copiar(linkBronze, 'Bronze')}
+                    className="px-4 py-2 rounded-lg bg-teal-600 text-white font-medium inline-flex items-center gap-2 hover:bg-teal-700"
+                  >
+                    <Copy className="w-4 h-4" /> Copiar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-3">
         <div className="bg-amber-50 rounded-2xl border border-amber-200 p-6">

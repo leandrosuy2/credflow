@@ -31,4 +31,6 @@ export interface UsuarioLogado {
   email: string;
   tipo: TipoUsuario;
   vendedorPaiId?: string | null;
+  nivelId?: string | null;
+  nivel?: { id: string; nome: string } | null;
 }

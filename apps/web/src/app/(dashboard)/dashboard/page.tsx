@@ -1,10 +1,11 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { useAuth } from '@/contexts/AuthContext';
 import { vendasApi, clientesApi } from '@/lib/api';
-import { TrendingUp, DollarSign, Users, Loader2 } from 'lucide-react';
+import { TrendingUp, DollarSign, Users, Loader2, Link2 } from 'lucide-react';
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -230,13 +231,26 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
           <p className="text-slate-600">
             Você tem <strong>{Array.isArray(clientes) ? clientes.length : 0}</strong> clientes cadastrados.
           </p>
-          <a href="/dashboard/clientes" className="inline-block mt-4 px-4 py-2 rounded-xl bg-teal-500 hover:bg-teal-600 text-white font-medium transition">
+          <a href="/dashboard/clientes" className="inline-block px-4 py-2 rounded-xl bg-teal-500 hover:bg-teal-600 text-white font-medium transition">
             Ver clientes
           </a>
+          {(user?.nivel?.nome === 'OURO' || user?.nivel?.nome === 'PRATA') && (
+            <div className="pt-4 border-t border-slate-100">
+              <p className="text-slate-600 text-sm mb-2">
+                <strong>Links de indicação:</strong> Ouro indica Prata, Prata indica Bronze. Envie o link para a pessoa se cadastrar.
+              </p>
+              <Link
+                href="/dashboard/bonus-saques"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium transition"
+              >
+                <Link2 className="w-4 h-4" /> Copiar meus links
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -16,6 +16,7 @@ export class AuthService {
   async login(email: string, senha: string) {
     const usuario = await this.prisma.usuario.findUnique({
       where: { email: email.toLowerCase(), status: 'ATIVO' },
+      include: { nivel: { select: { id: true, nome: true } } },
     });
     if (!usuario || !(await bcrypt.compare(senha, usuario.senhaHash))) {
       throw new UnauthorizedException('Email ou senha inválidos');
@@ -30,6 +31,8 @@ export class AuthService {
         email: usuario.email,
         tipo: usuario.tipo,
         vendedorPaiId: usuario.vendedorPaiId,
+        nivelId: usuario.nivelId,
+        nivel: usuario.nivel ? { id: usuario.nivel.id, nome: usuario.nivel.nome } : null,
       },
     };
   }

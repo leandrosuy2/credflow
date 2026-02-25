@@ -164,6 +164,66 @@ export class UsuariosService {
     });
   }
 
+  /**
+   * Cadastro por link de indicação: Ouro indica Prata, Prata indica Bronze.
+   * Retorna o usuário criado (sem senha).
+   */
+  async createByIndicacao(
+    indicadorId: string,
+    nivelNome: 'PRATA' | 'BRONZE',
+    data: { nome: string; email: string; senha: string },
+  ) {
+    const indicador = await this.prisma.usuario.findUnique({
+      where: { id: indicadorId, status: 'ATIVO' },
+      include: { nivel: true },
+    });
+    if (!indicador) throw new ForbiddenException('Indicador inválido ou inativo.');
+    const indicadorNivel = indicador.nivel?.nome;
+    if (nivelNome === 'PRATA') {
+      if (indicadorNivel !== 'OURO') throw new ForbiddenException('Apenas usuários Ouro podem indicar cadastros Prata.');
+    } else {
+      if (indicadorNivel !== 'PRATA' && indicadorNivel !== 'OURO') {
+        throw new ForbiddenException('Apenas usuários Prata ou Ouro podem indicar cadastros Bronze.');
+      }
+    }
+    const nivel = await this.prisma.nivel.findUnique({
+      where: { nome: nivelNome },
+    });
+    if (!nivel) throw new ForbiddenException('Nível não encontrado.');
+    const existente = await this.prisma.usuario.findUnique({
+      where: { email: data.email.toLowerCase() },
+    });
+    if (existente) throw new ForbiddenException('Este e-mail já está cadastrado.');
+    return this.create({
+      nome: data.nome,
+      email: data.email,
+      senha: data.senha,
+      tipo: 'vendedor',
+      indicadorId,
+      nivelId: nivel.id,
+    });
+  }
+
+  /** Valida link de indicação (public). Retorna dados para exibir na tela de cadastro. */
+  async getLinkIndicacao(indicadorId: string, nivelNome: string) {
+    if (nivelNome !== 'PRATA' && nivelNome !== 'BRONZE') {
+      throw new ForbiddenException('Nível deve ser PRATA ou BRONZE.');
+    }
+    const indicador = await this.prisma.usuario.findUnique({
+      where: { id: indicadorId, status: 'ATIVO' },
+      include: { nivel: { select: { nome: true } } },
+    });
+    if (!indicador) throw new ForbiddenException('Link inválido ou expirado.');
+    const ok =
+      (nivelNome === 'PRATA' && indicador.nivel?.nome === 'OURO') ||
+      (nivelNome === 'BRONZE' && (indicador.nivel?.nome === 'PRATA' || indicador.nivel?.nome === 'OURO'));
+    if (!ok) throw new ForbiddenException('Este link não é válido para este nível.');
+    return {
+      indicadorNome: indicador.nome,
+      nivel: nivelNome,
+    };
+  }
+
   /** Árvore de indicação (quem indicou quem) - para admin. */
   async arvoreIndicacao(): Promise<Array<{ id: string; nome: string; email: string; tipo: string; nivel?: string; indicados: unknown[] }>> {
     const raizes = await this.prisma.usuario.findMany({

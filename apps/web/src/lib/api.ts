@@ -32,6 +32,21 @@ export const authApi = {
     }),
 };
 
+/** Cadastro por link de indicação (público, sem token). */
+export const cadastroIndicacaoApi = {
+  validarLink: (indicadorId: string, nivel: string) =>
+    api<{ indicadorNome: string; nivel: string }>(
+      `/cadastro-indicacao/link?indicador=${encodeURIComponent(indicadorId)}&nivel=${encodeURIComponent(nivel)}`,
+      { token: null }
+    ),
+  cadastrar: (body: { indicadorId: string; nivel: 'PRATA' | 'BRONZE'; nome: string; email: string; senha: string }) =>
+    api<unknown>('/cadastro-indicacao', {
+      method: 'POST',
+      body: JSON.stringify(body),
+      token: null,
+    }),
+};
+
 export const usuariosApi = {
   list: () => api<unknown[]>('/usuarios'),
   get: (id: string) => api<unknown>(`/usuarios/${id}`),
