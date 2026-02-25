@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, Suspense } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -12,7 +12,7 @@ const NIVEL_LABEL: Record<string, string> = {
   BRONZE: 'Bronze',
 };
 
-export default function CadastroIndicacaoPage() {
+function CadastroIndicacaoContent() {
   const searchParams = useSearchParams();
   const indicadorId = searchParams.get('indicador') ?? '';
   const nivelParam = (searchParams.get('nivel') ?? '').toUpperCase();
@@ -208,5 +208,17 @@ export default function CadastroIndicacaoPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function CadastroIndicacaoPage() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+        <div className="text-white">Carregando...</div>
+      </main>
+    }>
+      <CadastroIndicacaoContent />
+    </Suspense>
   );
 }
