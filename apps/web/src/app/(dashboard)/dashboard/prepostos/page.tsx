@@ -16,12 +16,12 @@ type Preposto = {
   nome: string;
   email: string;
   status: string;
-  dataCriacao: string;
+  dataCriacao?: string;
   _count?: { clientes: number };
 };
 
 export default function PrepostosPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [lista, setLista] = useState<Preposto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,16 +33,26 @@ export default function PrepostosPage() {
   const [submitLoading, setSubmitLoading] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
 
-  const load = () => usuariosApi.prepostos().then((data) => setLista((data as Preposto[]) || []));
+  const load = () =>
+    usuariosApi
+      .prepostos()
+      .then((data) => setLista(Array.isArray(data) ? (data as Preposto[]) : []))
+      .catch(() => setLista([]))
+      .finally(() => setLoading(false));
 
   useEffect(() => {
-    if (!user) return;
+    if (authLoading) return;
+    if (!user) {
+      router.replace('/login');
+      return;
+    }
     if (user.tipo !== 'vendedor') {
       router.replace('/dashboard');
       return;
     }
-    load().finally(() => setLoading(false));
-  }, [user, router]);
+    setLoading(true);
+    load();
+  }, [user, authLoading, router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -101,7 +111,8 @@ export default function PrepostosPage() {
     setFormEditar({ nome: p.nome, email: p.email, senha: '' });
   };
 
-  if (user?.tipo !== 'vendedor') return null;
+  if (authLoading || !user) return <div className="py-12 text-center text-slate-500">Carregando…</div>;
+  if (user.tipo !== 'vendedor') return null;
 
   const columns: Column<Preposto>[] = [
     { key: 'nome', label: 'Nome', sortable: true, headerIcon: <User className="w-4 h-4" />, render: (r) => <span className="font-medium text-slate-800">{r.nome}</span> },
