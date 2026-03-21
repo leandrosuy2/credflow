@@ -52,6 +52,7 @@ export const usuariosApi = {
   get: (id: string) => api<unknown>(`/usuarios/${id}`),
   vendedores: () => api<unknown[]>('/usuarios/vendedores'),
   prepostos: () => api<unknown[]>('/usuarios/prepostos'),
+  meusIndicados: () => api<{ total: number; lista: unknown[] }>('/usuarios/meus-indicados'),
   me: () => api<unknown>('/usuarios/me'),
   create: (body: { nome: string; email: string; senha: string; tipo: string; vendedorPaiId?: string; indicadorId?: string; nivelId?: string }) =>
     api<unknown>('/usuarios', { method: 'POST', body: JSON.stringify(body) }),
@@ -176,9 +177,10 @@ export const pagamentosUsuarioApi = {
 };
 
 export const auditApi = {
-  listar: (params?: { entidade?: string; usuarioAdminId?: string; dataInicio?: string; dataFim?: string; limit?: number }) => {
+  listar: (params?: { entidade?: string; entidadeId?: string; usuarioAdminId?: string; dataInicio?: string; dataFim?: string; limit?: number }) => {
     const q = new URLSearchParams();
     if (params?.entidade) q.set('entidade', params.entidade);
+    if (params?.entidadeId) q.set('entidadeId', params.entidadeId);
     if (params?.usuarioAdminId) q.set('usuarioAdminId', params.usuarioAdminId);
     if (params?.dataInicio) q.set('dataInicio', params.dataInicio);
     if (params?.dataFim) q.set('dataFim', params.dataFim);

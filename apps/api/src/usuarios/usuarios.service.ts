@@ -108,7 +108,7 @@ export class UsuariosService {
   ) {
     const anterior = await this.prisma.usuario.findUnique({
       where: { id },
-      select: { nome: true, email: true, status: true, indicadorId: true, nivelId: true },
+      select: { nome: true, email: true, status: true, indicadorId: true, nivelId: true, nivel: { select: { nome: true } } },
     });
     const update: Record<string, unknown> = {};
     if (data.nome != null) update.nome = data.nome;
@@ -121,22 +121,58 @@ export class UsuariosService {
     const atualizado = await this.prisma.usuario.update({
       where: { id },
       data: update as never,
-      select: { id: true, nome: true, email: true, tipo: true, status: true, indicadorId: true, nivelId: true },
+      select: { id: true, nome: true, email: true, tipo: true, status: true, indicadorId: true, nivelId: true, nivel: { select: { nome: true } } },
     });
 
-    if (adminId && anterior && (data.status != null || data.nivelId !== undefined)) {
-      await this.audit.log({
-        entidade: 'Usuario',
-        entidadeId: id,
-        acao: 'UPDATE',
-        usuarioAdminId: adminId,
-        valorAnterior: JSON.stringify(anterior),
-        valorNovo: JSON.stringify(atualizado),
-        detalhes: data.status != null ? `Status alterado para ${data.status}` : 'Dados alterados',
-      });
+    if (adminId && anterior) {
+      if (data.nivelId !== undefined && anterior.nivelId !== (atualizado as { nivelId?: string | null }).nivelId) {
+        const nivelAnterior = (anterior as { nivel?: { nome: string } }).nivel?.nome ?? '—';
+        const nivelNovo = (atualizado as { nivel?: { nome: string } }).nivel?.nome ?? '—';
+        await this.audit.log({
+          entidade: 'Usuario',
+          entidadeId: id,
+          campo: 'nivelId',
+          acao: 'ALTERAR_NIVEL',
+          usuarioAdminId: adminId,
+          valorAnterior: nivelAnterior,
+          valorNovo: nivelNovo,
+          detalhes: `Alteração de nível: ${nivelAnterior} → ${nivelNovo}`,
+        });
+      }
+      if (data.status != null) {
+        await this.audit.log({
+          entidade: 'Usuario',
+          entidadeId: id,
+          acao: 'UPDATE',
+          usuarioAdminId: adminId,
+          valorAnterior: JSON.stringify(anterior),
+          valorNovo: JSON.stringify(atualizado),
+          detalhes: `Status alterado para ${data.status}`,
+        });
+      }
     }
 
     return atualizado;
+  }
+
+  /** Lista usuários cadastrados pelo vendedor via link de indicação (indicadorId = userId). */
+  async findMeusIndicados(usuarioId: string) {
+    const [lista, total] = await Promise.all([
+      this.prisma.usuario.findMany({
+        where: { indicadorId: usuarioId },
+        select: {
+          id: true,
+          nome: true,
+          email: true,
+          status: true,
+          dataCriacao: true,
+          nivel: { select: { nome: true } },
+        },
+        orderBy: { dataCriacao: 'desc' },
+      }),
+      this.prisma.usuario.count({ where: { indicadorId: usuarioId } }),
+    ]);
+    return { total, lista };
   }
 
   /** Prepostos do vendedor logado (só vendedor pode ter prepostos). */

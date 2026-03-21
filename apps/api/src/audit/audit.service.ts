@@ -29,9 +29,10 @@ export class AuditService {
     });
   }
 
-  async listar(filtros?: { entidade?: string; usuarioAdminId?: string; dataInicio?: Date; dataFim?: Date }, limit = 200) {
+  async listar(filtros?: { entidade?: string; entidadeId?: string; usuarioAdminId?: string; dataInicio?: Date; dataFim?: Date }, limit = 200) {
     const where: Record<string, unknown> = {};
     if (filtros?.entidade) where.entidade = filtros.entidade;
+    if (filtros?.entidadeId) where.entidadeId = filtros.entidadeId;
     if (filtros?.usuarioAdminId) where.usuarioAdminId = filtros.usuarioAdminId;
     if (filtros?.dataInicio || filtros?.dataFim) {
       where.data = {};

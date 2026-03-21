@@ -65,6 +65,14 @@ export class UsuariosController {
     return this.usuarios.findOne(user.id);
   }
 
+  /** Cadastros realizados pelo link de indicação do vendedor (total + lista). */
+  @Get('meus-indicados')
+  @UseGuards(RolesGuard)
+  meusIndicados(@CurrentUser() user: Usuario) {
+    if (user.tipo !== 'vendedor') return { total: 0, lista: [] };
+    return this.usuarios.findMeusIndicados(user.id);
+  }
+
   @Get(':id')
   @UseGuards(RolesGuard)
   @Roles(TipoUsuario.admin)

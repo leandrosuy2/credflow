@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 const navVendedor = [
   { href: '/dashboard', label: 'Início' },
+  { href: '/dashboard/meu-link-indicacao', label: 'Meu Link de Indicação' },
   { href: '/dashboard/clientes', label: 'Clientes' },
   { href: '/dashboard/prepostos', label: 'Prepostos' },
   { href: '/dashboard/bonus-saques', label: 'Bônus e Saques' },

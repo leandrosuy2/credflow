@@ -14,6 +14,7 @@ export class AuditController {
   @Get()
   listar(
     @Query('entidade') entidade?: string,
+    @Query('entidadeId') entidadeId?: string,
     @Query('usuarioAdminId') usuarioAdminId?: string,
     @Query('dataInicio') dataInicio?: string,
     @Query('dataFim') dataFim?: string,
@@ -22,6 +23,7 @@ export class AuditController {
     return this.audit.listar(
       {
         entidade,
+        entidadeId,
         usuarioAdminId,
         dataInicio: dataInicio ? new Date(dataInicio) : undefined,
         dataFim: dataFim ? new Date(dataFim) : undefined,
